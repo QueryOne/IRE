@@ -41,7 +41,6 @@ parseQt = function(datum) {
     if (L < 0) { return '' }
     return decode(grab(v, L)) 
   }
-  var readIntString = function(v) { return decode(grab(v, read('int32'))) }
 
   var grab = function(g, len) {
     __debug(len, 15)
