@@ -28,6 +28,20 @@ let __debug = function(msg, threshold) {
   }
 }
 
+getMap = async function() {
+  let url  = 'http://ire-mudlet-mapping.github.io/AchaeaCrowdmap/Map/map'
+  var blob, file;
+  blob = await fetch(url).then(r => r.blob()) // https://stackoverflow.com/a/52410044
+
+  let reader = new FileReader()
+  reader.readAsArrayBuffer(blob)
+  reader.onload = function() {
+    bytes = new Uint8Array(reader.result);
+    map = parseQt(bytes)
+    console.log(map)
+  }
+}
+
 parseQt = function(datum) {
   const enc     = new TextDecoder("utf-8")
   const dataV   = new DataView(datum.buffer)
