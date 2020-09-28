@@ -107,7 +107,7 @@ parseQt = function(datum) {
     var green = read('uint16') / channel
     var blue  = read('uint16') / channel
     var pad   = read('uint16') / channel
-    map.customEnvColors.push({key: key, value: {spec: spec, alpha: alpha, red: red, green: green, blue: blue, pad: pad}})
+    map.customEnvColors.list.push({key: key, value: {spec: spec, alpha: alpha, red: red, green: green, blue: blue, pad: pad}})
   }
 
   // hashToRoomID === QMap<QString, int>
@@ -224,7 +224,7 @@ parseQt = function(datum) {
       bounds[boundsDefined[j]] = t
     }
 
-    // QVector3D pos; 
+    // pos === QVector3Dpos
     let pos = {
       x: read('double'),
       y: read('double'),
@@ -234,11 +234,11 @@ parseQt = function(datum) {
     let isZone = read('int8')
     let zoneAreaRef = read('uint32')
 
-    // mUserData; QMap<QString, QString> mUserData;
+    // mUserData === QMap<QString, QString>
     let userDataLength = read('uint32')
     let userData       = []
     for (var j = 0; j < userDataLength; j++) {
-      userData.push([decode(grab(datum,read('uint32'))), decode(grab(datum,read('uint32')))])
+      userData.push([readString(datum), readString(datum)])
     }
     
     let area = {
