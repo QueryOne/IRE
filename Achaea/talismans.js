@@ -1,7 +1,7 @@
-// replace Q.core.send when ready
-
 talismans = (function(){
+  // Replace these 4 functions with your own as they are not included.
   var print     = Q.core.print
+  var send      = Q.core.send
   var lpad      = Utilities.lpad
   var rpad      = Utilities.rpad
   
@@ -24,7 +24,7 @@ talismans = (function(){
     dataset()
     
     active = true
-    Triggers.make(trg_more, `if (talismans.active()) { Q.core.send("more") }`, 'talismans.more')
+    Triggers.make(trg_more, `if (talismans.active()) { send("more") }`, 'talismans.more')
     Triggers.make(trg_end,  `if (talismans.active()) { console.log(talismans.data()) }`, 'talismans.off') // talismans.active(false); Triggers.deactivate("talismans.more"); 
     Triggers.make(trg_head, `console.log(matches)`, 'talismans.header')
     Triggers.make(trg_eachA, `talismans.parse(matches)`, 'talismans.line') // console.log(matches); 
