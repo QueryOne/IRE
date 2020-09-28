@@ -72,14 +72,15 @@ parseQt = function(datum) {
   }
   
   let list = []
-  let map = {}
-      map.envColors = []
-      map.areas     = []
+  let map  = {}
+      map.envColors   = []
+      map.areas       = []
       map.customEnvColors = {}
-      map.hash      = {}
-      map.userData  = {}
-      map.userFont  = {}
-      map.details   = {}
+      map.hash        = {}
+      map.userData    = {}
+      map.userFont    = {}
+      map.details     = {}
+      map.mRoomIdHash = []
 
   // mVersion === int
   map.version = read('uint32')
@@ -211,8 +212,7 @@ parseQt = function(datum) {
       z: read('double'),
     }
 
-    // xmaxForZ; ymaxForZ; xminForZ; yminForZ; QMap<int, int> xminForZ;
-    // n + n*QMap<int, int> xmaxForZ; n + n*QMap<int, int> ymaxForZ; n + n*QMap<int, int> xminForZ; n + n*QMap<int, int> yminForZ;
+    // xmaxForZ, ymaxForZ, xminForZ, yminForZ === QMap<int, int>
     let boundsDefined = ['xmaxForZ','ymaxForZ','xminForZ','yminForZ']
     let bounds = {}
     for (var j = 0; j < boundsDefined.length; j++) {
@@ -257,16 +257,15 @@ parseQt = function(datum) {
 
       userData    : userData,
     }
-    map.details.list.push(area) // console.log(area)
+    map.details.list.push(area)
   }
+  __debug(map.details, 5)
 
-  // QHash<QString, int> mRoomIdHash;
+  // mRoomIdHash === QHash<QString, int>
   let hashLength = read('uint32')
-  list = []
   for (var i = 0; i < hashLength; i++) {
-    list.push([decode(grab(datum,read('uint32'))), read('int32')])
+    map.mRoomIdHash.push([readString(datum), read('int32')])
   }
-  map.mRoomIdHash = list
 
   // Labels loop
   let labelLength = read('uint32')
@@ -280,13 +279,13 @@ parseQt = function(datum) {
 
     for (var j = 0; j < size; j++) {
       label = {}
-      // QVector3D pos; QPointF pointer; QSizeF size; QString text; QColor fgColor;
-      // QColor bgColor; QPixmap pix; >>>> QImage image;
+      // id === QString, pos === QVector3D, pointer === QPointF<float, float>
+      // size === QSizeF<float, float>, text === QString, fgColor === QColor, bgColor === QColor
       label.id       = read('uint32')
       label.position = {x: read('float'), y: read('float'), z: read('float')}
       label.pointer  = [read('float'), read('float')]
       label.size     = {w: read('float'), h: read('float')}
-      label.text     = decode(grab(datum,read('uint32')))
+      label.text     = readString(datum)
       label.fgColor  = {
         spec : read('int8'), 
         alpha: read('uint16') / chan, 
@@ -304,12 +303,15 @@ parseQt = function(datum) {
         pad  : read('uint16') / chan,
       }
       
-      // test QPixmap(that is, QImage)
+      // test === QPixmap === QImage
+      // QImage === Qt can gfy
+      //    This is not fully implemented, as I cannot care more about custom PNGs
+      //    If something other than PNG is encoded, we're fucked, but also, the Qt serializer prefers PNGs > BMPs so whatever
       var testImage = read('uint32')
       if (testImage == 0) {
         // do nothing
       } else {
-        // console.log('There is a picture to read (' + (testImage ? 'true' : 'ERR') + ' @ ' + position + '): Label-' + label.id) 
+        __debug('There is a picture to read (' + (testImage ? 'true' : 'ERR') + ' @ ' + position + '): Label-' + label.id, 9) 
         var header = grab(datum, 8)
         var png    = {}
         if (equalBytes(header,pngSpec)) {
@@ -317,6 +319,7 @@ parseQt = function(datum) {
             var chunkType    = decode(grab(datum,4))
             var chunkContent = grab(datum, chunkLength)
             var chunkCRC     = grab(datum,4)
+            // This next png. section doesn't actually move our position forward, just reading out of curiosity
             png.width       = chunkContent.slice(0, 4)
             png.height      = chunkContent.slice(4, 4 + 4)
             png.bitDepth    = chunkContent.slice(8, 8 + 1)
@@ -345,14 +348,14 @@ parseQt = function(datum) {
   }
   map.labels = labels
 
-  console.log('Leftover bytes to read into rooms: ' + (datum.length - position) + '.')
+  __debug('Leftover bytes to read into rooms: ' + (datum.length - position) + '.', 2)
 
   // void TRoom::restore(QDataStream& ifs, int roomID, int version)
-  rooms = {}
-  c = 0
-  while(position < datum.length) {
+  let rooms = {}
+  let c = 0
+  while (position < datum.length) {
     var roomid = read('uint32')
-    __debug('Now parsing room  ' + roomid + ' in cycle ' + c + '.', 4)
+    __debug('Now parsing room  ' + roomid + ' in cycle ' + c + '.', 5)
     var area   = read('uint32')
     var x      = read('int32')
     var y      = read('int32')
@@ -462,7 +465,6 @@ parseQt = function(datum) {
         var s = read('int8')
         var lineStyle = read('int8')
         customLinesStyle[key] = [lineStyle, r, s]
-// console.log(read('int8'))
       }
       __debug(customLinesStyle, 3)
     }
@@ -531,18 +533,12 @@ parseQt = function(datum) {
     c += 1
   }
   map.rooms = rooms
-
-  // console.log(rooms)
-  // console.log(decode(grab(datum, 133)))
   
-  console.log('Map:')
+  console.log('Map read is complete.')
   console.log('  Map Version is ' + map.version + '.')
   console.log('  Area Count: ' + map.areas.length + '.')
-  var str = '  Some areas defined so far:'
-  for (var i = 0; i < 15; i++) {
-    let area = map.areas[i]
-    str += ' ' + area.value + ' (' + area.key + '),'
-  }
+  console.log('  # of Rooms read: ' + c + '.')
+  __debug(map, 5)
 
   return map
 }
