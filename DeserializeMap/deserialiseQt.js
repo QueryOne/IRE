@@ -73,6 +73,7 @@ parseQt = function(datum) {
 	return true;
   }
   
+  let list = []
   let map = {}
       map.envColors = []
       map.areas     = []
@@ -82,24 +83,21 @@ parseQt = function(datum) {
       map.userFont  = {}
       map.details   = {}
 
-  // V: mVersion, T: int, S: quint32??
+  // mVersion === int
   map.version = read('uint32')
-
-  // V: envColors, T: QMap, S: quint32
-  // V: envColors.key, envColors.value, T: QMap<int, int> envColors;
-  let list = [];
+	
+  // envColors === QMap<int, int>
   for (var i = 0, len = read('uint32'); i < len; i++) {
     map.envColors.push({key: read('uint32'), value: read('uint32')})
   }
 
-  // V: areas, T: QMap, S: quint32, then quint32, string
-  // QMap<int, QString> areaNamesMapWithPossibleEmptyOrDuplicateItems;
-  list = []
+  // areas === QMap<int, QString>
   for (var i = 0, len = read('uint32'); i < len; i++) {
     map.areas.push({key: read('uint32'), value: readString(datum)})
   }
 
-  // V: customEnvColors, T: QMap<int, QColor> customEnvColors;
+  // customEnvColors === QMap<int, QColor>
+  // QColor === QString, bool, uint16, uint16, uint16, uint16, uint16 (name, spec, alpha, red, green, blue, pad)
   map.customEnvColors.size = read('uint32')
   list = []
   let use255  = true
@@ -117,61 +115,57 @@ parseQt = function(datum) {
   }
   map.customEnvColors.list = list
 
-  // V: mpRoomDB, hashToRoomID; T: QMap<QString, int> hashToRoomID;, ifs >> mpRoomDB->hashToRoomID;
+  // hashToRoomID === QMap<QString, int>
   map.hash.size = read('uint32')
-  list = []
+  map.hash.list = []
   for (var i = 0; i < map.hash.size; i++) {
-    let hash = decode(grab(datum, read('uint32')))
-    let id   = read('uint32')
-    list.push({hash: hash, id: id})
+    map.hash.list.push({hash: readString(datum), id: read('uint32')})
   }
-  map.hash.list = list
 
-  // ifs >> mUserData; QMap<QString, QString> mUserData;
-  list = []
+  // mUserData === QMap<QString, QString>
+  map.userData.list = []
   for (var i = 0, len = read('uint32'); i < len; i++) {
-    list.push({key: readString(datum), val: readString(datum)})
+    map.userData.list.push({key: readString(datum), val: readString(datum)})
   }
-  map.userData.list = list
   
-  // console.log(read('uint32'))
-
-  // ifs >> mMapSymbolFont; QFont mMapSymbolFont; QString + qint16 + quint8 x 4
-  // family, pointsize, stylehint, char set, weight, font bits
-  /*
-   , mMapSymbolFont(QFont(QStringLiteral("Bitstream Vera Sans Mono"), 12, QFont::Normal))
-   , mMapSymbolFontFudgeFactor(1.0)
-   , mIsOnlyMapSymbolFontToBeUsed(false)
-   */
-  map.userFont.family = readString(datum) // decode(grab(datum, read('int32')))
-
-  map.userFont.styleName = read('int32')  // -1
-  map.userFont.pointSize = read('float')  // 12
-  map.userFont.pixelSize = read('int32')  // -1
-  map.userFont.styleHint = read('int8')   // 5 >> QFont::AnyStyle
+  // mMapSymbolFont === QFont
+  // QFont === QString, ENum, Float, ENum, ENum, ENum, ENum, ENum, ENum, ENum, ENum, QString, QString, ENum, ENum
+  // QFont === (family, styleName, pixelSize, styleHint, styleStrategy, charSet, weight, bits, stretch, extendedBits, letterSpacing, wordSpacing, hintingPref, capitalization
+  //   Note that these are not fixed and can be modified unpredictably
+  //   The letterSpacing & wordSpacing data should be written as 'float's based on the Qt source code, but 8 byte intervals does not fit the datum provided.
+  //   So really, who the fuck knows.
+  map.userFont.family         = readString(datum)
+  map.userFont.styleName      = read('int32')  // -1
+  map.userFont.pointSize      = read('float')  // 12
+  map.userFont.pixelSize      = read('int32')  // -1
+  map.userFont.styleHint      = read('int8')   // 5 >> QFont::AnyStyle
   map.userFont.styleStrategy  = read('int16') // 4296 ?? 
-  map.userFont.charSet   = read('uint8')  // 0
-  map.userFont.weight    = read('uint8')  // 50 >> Normal
-  map.userFont.bits      = read('int8')   // 16
-  map.userFont.stretch   = read('uint16') // 0 >> AnyStretch
+  map.userFont.charSet        = read('uint8')  // 0
+  map.userFont.weight         = read('uint8')  // 50 >> Normal
+  map.userFont.bits           = read('int8')   // 16
+  map.userFont.stretch        = read('uint16') // 0 >> AnyStretch
   map.userFont.extendedBits   = read('uint8')  // 1
   map.userFont.letterSpacing  = read('uint32') // 0
   map.userFont.wordSpacing    = read('uint32') // 0
   map.userFont.hintingPref    = read('uint8')  // 0 >> PreferDefaultHinting
   map.userFont.capitalization = read('uint8')  // 0 >> MixedCase
   
-  let unknown  = grab(datum, 0) // 35
-  let unknownL = unknown.length
-      unknown  = decode(unknown)
-  console.log('Unresolved bits in QFont: ' + unknown + ' (' + unknownL + ')')
+  /* 
+    // This little segment lets you parse out variable length data to debug in case the QFont decides to dick around again with data types.
+    let unknown  = grab(datum, 0) // 35
+    let unknownL = unknown.length
+        unknown  = decode(unknown)
+    console.log('Unresolved bits in QFont: ' + unknown + ' (' + unknownL + ')')
+   */
 
+  // mMapSymbolFontFudgeFactor === float
+  // I'm only 85% sure this is correct, because of the above QFont parsing.
   map.userFont.fudgeFactor   = read('float')
 
-  // map.userFont.fudgeFactor   = bufferToHex(grab(datum, 8)) // read('int32') + read('int32')
-  map.userFont.mapSymbolFont = read('int8')  // grab(datum, 2)
+  // mIsOnlyMapSymbolFontToBeUsed === bool
+  map.userFont.mapSymbolFont = read('int8')
+  __debug(map.userFont, 9)
 
-  // console.log(map.userFont) //; console.log(map.userFont.family)
-  
   map.details = {}
   map.details.size = read('uint32')
   // console.log('Map Count: ' + map.details.size + ' vs ' + datum.length + ' total file size.')
