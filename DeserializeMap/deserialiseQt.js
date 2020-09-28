@@ -35,8 +35,7 @@ parseQt = function(datum) {
   let position  = 0
 
   var decode = function(arr) { return enc.decode(arr.filter(function(e){return e !== 0})) }
-  var readString = function(v) {
-    // would like to make this a single line function but fucking hell the variability in encoding needs debug lines
+  var readString = function(v) { // would like to make this a single line function but fucking hell the variability in encoding needs debug lines
     var L = read('int32')
     if (L < 0) { return '' }
     return decode(grab(v, L)) 
@@ -60,17 +59,16 @@ parseQt = function(datum) {
       case 'int64' : out =  dataV.getBigInt64( position, false ); position += 8; break;
       case 'uint64': out = dataV.getBigUint64( position, false ); position += 8; break;
       case 'float' : out =   dataV.getFloat64( position, false ); position += 8; break;
-
-      case 'double': out = (new Uint64BE(datum, position)).toNumber(); position += 8; break;
+      case 'double': out = (new Uint64BE(datum, position)).toNumber(); position += 8; break; // int64-buffer.min.js
       default: break;
     }
     return out
   }
   // PNG Handling
   var equalBytes = function(a, b) {
-	if (a.length != b.length) return false;
-	for (var l = a.length; l--;) if (a[l] != b[l]) return false;
-	return true;
+    if (a.length != b.length) return false;
+    for (var l = a.length; l--;) if (a[l] != b[l]) return false;
+    return true;
   }
   
   let list = []
@@ -99,21 +97,18 @@ parseQt = function(datum) {
   // customEnvColors === QMap<int, QColor>
   // QColor === QString, bool, uint16, uint16, uint16, uint16, uint16 (name, spec, alpha, red, green, blue, pad)
   map.customEnvColors.size = read('uint32')
-  list = []
-  let use255  = true
-  let channel = use255 ? 257 : 1
+  map.customEnvColors.list = []
+  let channel = 257
   for (var i = 0; i < map.customEnvColors.size; i++) {
-    let key = read('uint32')
-    let spec  = read('int8')
-    // spec 1, should write code for other specs in future
-    let alpha = read('uint16') / channel
-    let red   = read('uint16') / channel
-    let green = read('uint16') / channel
-    let blue  = read('uint16') / channel
-    let pad   = read('uint16') / channel
-    list.push({key: key, value: {spec: spec, alpha: alpha, red: red, green: green, blue: blue, pad: pad}})
+    var key   = read('uint32')
+    var spec  = read('int8')   // spec 1, should write code for other specs in future
+    var alpha = read('uint16') / channel
+    var red   = read('uint16') / channel
+    var green = read('uint16') / channel
+    var blue  = read('uint16') / channel
+    var pad   = read('uint16') / channel
+    map.customEnvColors.push({key: key, value: {spec: spec, alpha: alpha, red: red, green: green, blue: blue, pad: pad}})
   }
-  map.customEnvColors.list = list
 
   // hashToRoomID === QMap<QString, int>
   map.hash.size = read('uint32')
@@ -139,7 +134,7 @@ parseQt = function(datum) {
   map.userFont.pointSize      = read('float')  // 12
   map.userFont.pixelSize      = read('int32')  // -1
   map.userFont.styleHint      = read('int8')   // 5 >> QFont::AnyStyle
-  map.userFont.styleStrategy  = read('int16') // 4296 ?? 
+  map.userFont.styleStrategy  = read('int16')  // 4296 ?? 
   map.userFont.charSet        = read('uint8')  // 0
   map.userFont.weight         = read('uint8')  // 50 >> Normal
   map.userFont.bits           = read('int8')   // 16
@@ -166,42 +161,40 @@ parseQt = function(datum) {
   map.userFont.mapSymbolFont = read('int8')
   __debug(map.userFont, 9)
 
-  map.details = {}
+  // mpRoomDB === QString
   map.details.size = read('uint32')
-  // console.log('Map Count: ' + map.details.size + ' vs ' + datum.length + ' total file size.')
   map.details.list = []
-  var n = map.details.size // ???
-  for (var i = 0; i < n; i++) {
-    // integer for RoomID
+  __debug('Instruction to read Map length of: ' + map.details.size + ' vs ' + datum.length + ' total file size.', 5)
+  for (var i = 0; i < map.details.size; i++) {
+    // roomID === QString
     let key = read('int32')
-
-    // QSet<int> rooms; // rooms of this area
+    __debug('Parsing room ' + key + '.', 12)
+	  
+    // rooms === QSet<int>
     let roomCount = read('uint32')
     let roomList  = []
     for (var j = 0; j < roomCount; j++) {
-      let roomKey = read('uint32')
-      roomList.push(roomKey)
+      roomList.push(read('uint32'))
     }
 
-    // QList<int> zLevels;
+    // zLevels === QList<int>
     let zCount = read('int32')
     let zList  = []
     for (var j = 0; j < zCount; j++) {
       zList.push(read('int32'))
     }
 
-    // QMultiMap<int, QPair<int, int>> exits;
+    // exits === QMultiMap<int, QPair<int, int>>
     let exCount = read('int32')
     let exList  = []
     for (var j = 0; j < exCount; j++) {
       exList.push([read('int32'),read('int32'),read('int32')])
     }
 
-    // bool gridMode;
+    // gridMode === bool
     let gridMode = read('int8')
 
-    // max X,Y,Z & min X,Y,Z
-    // x: -2 to 30, y: -84 to 0, z : 0 to 2 for [1]
+    // max_x, max_y, max_z, min_x, min_y, min_z === int
     let maxX = read('int32')
     let maxY = read('int32')
     let maxZ = read('int32')
@@ -210,7 +203,8 @@ parseQt = function(datum) {
     let minZ = read('int32')
     let coordinates = {max_x: maxX, max_y: maxY, max_z: maxZ, min_x: minX, min_y: minY, min_z: minZ}
 
-    // QVector3D span; double, double, double
+    // span === QVector3D
+    // QVector3D === double, double, double
     let Vector3D = {
       x: read('double'),
       y: read('double'),
